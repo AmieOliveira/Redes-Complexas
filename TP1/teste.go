@@ -1,10 +1,15 @@
 package main
 
 import (
+	"os"
 	"fmt"
+	"log"
+	"bufio"
+	"strings"
+	"strconv"
 	"math/rand"
 
-	//"gonum.org/v1/gonum/graph"
+	"gonum.org/v1/gonum/graph"
 	"gonum.org/v1/gonum/graph/simple"
 	"gonum.org/v1/gonum/graph/path"
 	"gonum.org/v1/gonum/graph/topo"
@@ -14,6 +19,10 @@ import (
 func main() {
 	n := 5
 	p := .8
+	directed := true
+	datapath := "Dados/Barabasi/metabolic.edgelist.txt"
+
+
 	rand.Seed(int64(0))
 
 	g := simple.NewUndirectedGraph()
@@ -54,6 +63,10 @@ func main() {
 	// Betweenness
 	btw := network.Betweenness(g)
 	fmt.Println("Betweenness do vértice ", vg, ": ", btw[vg])
+
+	gTest := create_graph(directed)
+	get_graph_barabasi(gTest, datapath)
+	fmt.Println(gTest)
 }
 
 
@@ -77,4 +90,49 @@ func printGraphInfo(g *simple.UndirectedGraph) {
 		fmt.Print(arestas.Edge(), ", ")
 	}
 	fmt.Println("\n")
+}
+
+
+func get_graph_barabasi(g graph.Graph, fname string) {
+	f, err := os.Open(fname)
+	if err != nil {
+        	log.Fatal(err)
+    	}
+	defer f.Close();
+
+	//g := create_graph(directed);
+
+	scanner := bufio.NewScanner(f);
+
+	i := 0;
+	for scanner.Scan() {
+		//fmt.Println(scanner.Text())
+
+		split := strings.Split(scanner.Text(), "	");
+        	//fmt.Println(split, "length: ", len(split))
+		id1, _ := strconv.Atoi(split[0]);
+		id2, _ := strconv.Atoi(split[1]);
+
+		n1 := simple.Node( id1 );
+		n2 := simple.Node( id2 );
+
+		g.SetEdge( g.NewEdge(n1, n2) );
+
+		if i > 10 {
+			break;
+		}
+		i++;
+    	}
+
+    	if err := scanner.Err(); err != nil {
+    	    log.Fatal(err);
+    	}
+}
+
+func create_graph(directed bool) graph.Graph {
+	if directed {
+		return simple.NewUndirectedGraph()
+	} else {
+		return simple.NewDirectedGraph()
+	}
 }
