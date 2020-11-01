@@ -6,11 +6,27 @@ import networkx as nx
 import bisect
 import numpy as np
 import matplotlib.pyplot as plt
+import json as js
+#import pandas as pd
 
 def load_graph(path):
     ftype = path.split(".")[-1]
     if ftype == "gml":
         return nx.read_gml(path, label='id')
+    #elif ftype == "csv":
+    #    df = pd.read_csv(path)
+    #    print(df.head(10))
+    #    Graphtype = nx.Graph()
+    #    # TODO: Para CSVs, parece que eu preciso setar manualmente o que são atributos...
+    #    return nx.from_pandas_edgelist(df, create_using=Graphtype)
+    elif ftype == "json":
+        with open(path) as f:
+            data = js.load(f)
+            return nx.readwrite.json_graph.node_link_graph(data)
+    elif ftype == "edges":
+        return nx.read_weighted_edgelist(path)
+    else:
+        print("Loading not implemented for given format")
 
 
 def degree_analysis(graph):
@@ -39,15 +55,15 @@ def degree_analysis(graph):
     desvio = 0
     for i in range(n):
         desvio += (d_list[i] - media)**2
-        distribuicao[1,d_list[i]-gmin] += 1
+        distribuicao[1,d_list[i]-gmin] += 1/n
     desvio = (desvio/n)**0.5
 
-    i = 0
-    while i < distribuicao.shape[1]:
-        if distribuicao[1,i] < 0.00000001:
-            distribuicao = np.delete(distribuicao, i, 1)
-            continue
-        i += 1
+    #i = 0
+    #while i < distribuicao.shape[1]:
+    #    if distribuicao[1,i] < 0.00000001:
+    #        distribuicao = np.delete(distribuicao, i, 1)
+    #        continue
+    #    i += 1
 
     return gmin, gmax, media, desvio, mediana, distribuicao
 
@@ -94,7 +110,7 @@ def distance_analysis(graph):
     desvio = 0
     for i in range(c):
         desvio += (d_list[i] - media)**2
-        distribuicao[1,d_list[i]-dmin] += 1
+        distribuicao[1,d_list[i]-dmin] += 1/c
     desvio = (desvio/c)**0.5
 
     return dmin, dmax, media, desvio, mediana, distribuicao
@@ -114,10 +130,10 @@ def connexity_analysis(graph):
     desvio = 0
     for i in range(n):
         desvio += (comp[i] - media)**2
-        distribuicao[1, comp[i]-cmin] += 1
+        distribuicao[1, comp[i]-cmin] += 1/n
     desvio = (desvio/n)**0.5
 
-    return cmin, cmax, media, desvio, mediana, distribuicao
+    return n, cmin, cmax, media, desvio, mediana, distribuicao
 
 
 def betweenness_analysis(graph):
@@ -192,35 +208,130 @@ def clustering_analysis(graph):
 
 
 
-
-
-
 if __name__ == "__main__":
-    datapath = "Dados/Newman/karate.gml"
+    outFile = "Dados/estatisticas.txt"
+    datapaths = ["Dados/Newman/karate.gml", "Dados/Newman/lesmis.gml",
+                 "Dados/Newman/netscience.gml",
+                 "Dados/ICON/starwars-full-interactions.json",
+                 "Dados/Outros/aves-songbird-social.edges"]
+    nomes = ["Karate Club", "Les Miserables", "Ciência das Redes", "Star Wars", "Pássaros Canoros"]
+    styles = ['--o', '--s', '--^', '--*', '--X'] # D,p
+
+    f = open(outFile, "w")
+
+    figDeg = plt.figure("Grau")
+    plt.title("PDFs empíricas dos graus das redes")
+    figDist = plt.figure("Distância")
+    plt.title("PDFs empíricas das distâncias nas redes")
+    figCon = plt.figure("Componentes Conexas")
+    plt.title("PDFs empíricas dos tamanhos das componentes conexas das redes")
+    figBet = plt.figure("Betweenness")
+    plt.title("CCDFs empíricas de contralidade por betweenness nas redes")
+    figClose = plt.figure("Closeness")
+    plt.title("CCDFs empíricas de contralidade por closeness nas redes")
+    figClus = plt.figure("Clusterização")
+    plt.title("CCDFs empíricas da clusterização dos vértices das redes")
+
+    for pathIdx in range(len(datapaths)):
+        g = load_graph(datapaths[pathIdx])
+
+        print(nomes[pathIdx], ": (", g.number_of_nodes(), g.number_of_edges(), ")")
+
+        f.write(f"REDE: {nomes[pathIdx]} - {g.number_of_nodes()} vértices X "
+                f"{g.number_of_edges()} arestas ({datapaths[pathIdx]})\n")
+
+        deg = degree_analysis(g)
+        f.write(f"Grau: "
+                f"\tMínimo: {deg[0]}\n"
+                f"\tMáximo: {deg[1]}\n"
+                f"\tMédia: {deg[2]} +- {deg[3]}\n"
+                f"\tMediana: {deg[4]}\n"
+                f"{deg[5]} (PDF)\n\n")
+        plt.figure(figDeg.number)
+        plt.plot(deg[5][0], deg[5][1], styles[pathIdx], linewidth=.8, label=nomes[pathIdx])
+        if nomes[pathIdx] == nomes[-1]:
+            plt.legend()
+
+        dist = distance_analysis(g)
+        f.write(f"Distância: \n"
+                f"\tMínima: {dist[0]}\n"
+                f"\tMáxima: {dist[1]}\n"
+                f"\tMédia: {dist[2]} +- {dist[3]}\n"
+                f"\tMediana: {dist[4]}\n"
+                f"{dist[5]} (PDF)\n\n")
+        plt.figure(figDist.number)
+        plt.plot(dist[5][0], dist[5][1], styles[pathIdx], linewidth=.8, label=nomes[pathIdx])
+        if nomes[pathIdx] == nomes[-1]:
+            plt.legend()
+
+        try:
+            con = connexity_analysis(g)
+            f.write(f"Componentes conexas: {con[0]} componentes independentes \n"
+                    f"\tMínima: {con[1]}\n"
+                    f"\tMáxima: {con[2]}\n"
+                    f"\tMédia: {con[3]} +- {con[4]}\n"
+                    f"\tMediana: {con[5]}\n"
+                    f"{con[6]} (PDF)\n\n")
+            plt.figure(figCon.number)
+            plt.plot(con[6][0], con[6][1], styles[pathIdx], linewidth=.8, label=nomes[pathIdx])
+            plt.legend()
+        except nx.NetworkXNotImplemented:
+            print("Grafo é direcionado, análise de componenetes conexas nao realizada")
+            # TODO: Fazer versão fortemente conexa?
+
+        # Analises de contralidade: betweenness e closeness
+        bet = betweenness_analysis(g)
+        f.write(f"Betweenness: \t(Contralidade 1)\n"
+                f"\tMínimo: {bet[0]}\n"
+                f"\tMáximo: {bet[1]}\n"
+                f"\tMédia: {bet[2]} +- {bet[3]}\n"
+                f"\tMediana: {bet[4]}\n"
+                f"{bet[5]} (CCDF)\n\n")
+        plt.figure(figBet.number)
+        plt.plot(bet[5][0], bet[5][1], styles[pathIdx], linewidth=.8, label=nomes[pathIdx])
+        if nomes[pathIdx] == nomes[-1]:
+            plt.legend()
+        close = closeness_analysis(g)
+        f.write(f"Closeness: \t(Contralidade 2)\n"
+                f"\tMínimo: {close[0]}\n"
+                f"\tMáximo: {close[1]}\n"
+                f"\tMédia: {close[2]} +- {close[3]}\n"
+                f"\tMediana: {close[4]}\n"
+                f"{close[5]} (CCDF)\n\n")
+        plt.figure(figClose.number)
+        plt.plot(close[5][0], close[5][1], styles[pathIdx], linewidth=.8, label=nomes[pathIdx])
+        if nomes[pathIdx] == nomes[-1]:
+            plt.legend()
+
+        try:
+            clust = clustering_analysis(g)
+            f.write(f"Clustering: \n"
+                    f"\tMínimo: {bet[0]}\n"
+                    f"\tMáximo: {bet[1]}\n"
+                    f"\tMédia: {bet[2]} +- {bet[3]}\n"
+                    f"\tMediana: {bet[4]}\n"
+                    f"{bet[5]} (CCDF)\n")
+            plt.figure(figClus.number)
+            plt.plot(clust[5][0], clust[5][1], styles[pathIdx], linewidth=.8, label=nomes[pathIdx])
+            plt.legend()
+        except nx.NetworkXNotImplemented:
+            print("Grafo é 'multigraph', análise de clusterização não realizada")
+
+        f.write("--------------------------\n\n")
 
 
-    g = load_graph(datapath)
-    #g = nx.path_graph(4)
-    #nx.add_path(g, [10, 11, 12])
-    #print(g.nodes(), g.edges())
+    plt.figure(figClus.number)
+    plt.savefig("Dados/distribuicao-clusterizacao.pdf")
+    plt.figure(figClose.number)
+    plt.savefig("Dados/distribuicao-closeness.pdf")
+    plt.figure(figBet.number)
+    plt.savefig("Dados/distribuicao-betweenness.pdf")
+    plt.figure(figCon.number)
+    plt.savefig("Dados/distribuicao-compConexas.pdf")
+    plt.figure(figDist.number)
+    plt.savefig("Dados/distribuicao-distancias.pdf")
+    plt.figure(figDeg.number)
+    plt.savefig("Dados/distribuicao-graus.pdf")
+    #plt.show()
 
-    print(type(g), g.number_of_nodes(), g.number_of_edges())
-
-    print(degree_analysis(g))
-
-    print(distance_analysis(g))
-
-    try:
-        print(connexity_analysis(g))
-    except nx.NetworkXNotImplemented:
-        print("Grafo é direcionado, não dá para fazer esta análise")
-        # TODO: Fazer versão fortemente conexa?
-
-    # Analises de contralidade: betweenness e closeness
-    print(betweenness_analysis(g))
-    print(closeness_analysis(g))
-
-    print(clustering_analysis(g))
-
-
-    # TODO: Criar gráficos/tabelas comparando diferentes instâncias!!
+    f.close()

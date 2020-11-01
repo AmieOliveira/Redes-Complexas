@@ -1,0 +1,5 @@
+Python Dependency Network
+Python's package dependency networks. Nodes in the network are Python's packages registered to PyPI and edges are dependencies among packages.
+
+Extraído de “https://icon.colorado.edu/#!/networks”
+Citação: http://kgullikson88.github.io/blog/pypi-analysis.html

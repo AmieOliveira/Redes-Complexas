@@ -1,0 +1,8 @@
+Star Wars coappearances
+Networks of scene coappearances of characters in Star Wars, Episodes 1-7 individually and all together. Nodes are unique characters and edges weights denote the number of scenes in which both characters speak.
+
+Citation: E. Gabasova, "The Star Wars social network." Evelina Gabasova's Blog, Accessed 31 December (2015)
+http://evelinag.com/blog/2015/12-15-star-wars-social-network/
+
+Data hosted by evelinag on Github
+https://github.com/evelinag/StarWars-social-network/tree/master/networks
