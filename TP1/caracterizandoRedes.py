@@ -6,10 +6,11 @@ import networkx as nx
 import bisect
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib.ticker import NullFormatter
 import json as js
 #import pandas as pd
 
-def load_graph(path):
+def load_graph(path, directed=False, weighted=False):
     ftype = path.split(".")[-1]
     if ftype == "gml":
         return nx.read_gml(path, label='id')
@@ -23,10 +24,18 @@ def load_graph(path):
         with open(path) as f:
             data = js.load(f)
             return nx.readwrite.json_graph.node_link_graph(data)
-    elif ftype == "edges":
-        return nx.read_weighted_edgelist(path)
+    elif ftype in ["edges", "txt"]:
+        if directed:
+            print("Loading not implemented for directed edgelists")
+            return
+        else:
+            if weighted:
+                return nx.read_weighted_edgelist(path)
+            else:
+                return nx.read_edgelist(path)
     else:
         print("Loading not implemented for given format")
+        return
 
 
 def degree_analysis(graph):
@@ -94,7 +103,7 @@ def distance_analysis(graph):
                 continue
             n2 = l_nodes[j]
             try:
-                dist = nx.dijkstra_path_length(graph, n1, n2, "distance")
+                dist = nx.shortest_path_length(graph, n1, n2)
             except nx.NetworkXNoPath:
                 c -= 1
                 continue
@@ -113,7 +122,7 @@ def distance_analysis(graph):
         distribuicao[1,d_list[i]-dmin] += 1/c
     desvio = (desvio/c)**0.5
 
-    return dmin, dmax, media, desvio, mediana, distribuicao
+    return dmin, dmax, media, desvio, mediana, distribuicao, c
 
 
 def connexity_analysis(graph):
@@ -209,36 +218,76 @@ def clustering_analysis(graph):
 
 
 if __name__ == "__main__":
+    cmap = plt.get_cmap("tab10")
+
     outFile = "Dados/estatisticas.txt"
-    datapaths = ["Dados/Newman/karate.gml", "Dados/Newman/lesmis.gml",
-                 "Dados/Newman/netscience.gml",
-                 "Dados/ICON/starwars-full-interactions.json",
-                 "Dados/Outros/aves-songbird-social.edges"]
-    nomes = ["Karate Club", "Les Miserables", "Ciência das Redes", "Star Wars", "Pássaros Canoros"]
-    styles = ['--o', '--s', '--^', '--*', '--X'] # D,p
+
+    datasets = { "Karate Club": {'path': "Dados/Newman/karate.gml",
+                                 'weighted': False, 'directed': False,
+                                 'style': '--o', 'color':'tab:blue'},
+                 "Les Miserables": {'path': "Dados/Newman/lesmis.gml",
+                                    'weighted': True, 'directed': False,
+                                    'style': '--s', 'color':'tab:orange'},
+                 "Ciência das Redes": {'path': "Dados/Newman/netscience.gml",
+                                       'weighted': True, 'directed': False,
+                                       'style': '--^', 'color':'tab:green'},
+                 "Star Wars": {'path': "Dados/ICON/starwars-full-interactions.json",
+                               'weighted': True, 'directed': False,
+                               'style': '--*', 'color':'tab:red'},
+                 #"Pássaros Canoros": {'path': "Dados/Outros/aves-songbird-social.edges",
+                 #                     'weighted': True, 'directed': False,
+                 #                     'style': '--X', 'color':'tab:purple'},
+                 #"Actor": {'path': "Dados/Barabasi/actor.edgelist.txt",
+                 #          'weighted': False, 'directed': False,
+                 #          'style': '--D', 'color': 'tab:brown'},
+                 }  # Styles: D,p - Colors: tab:brown, tab:pink, tab:gray, tab:olive, tab:cyan
+
+
+    # --------------------------------
+    lastKey = list(datasets.keys())[-1]
 
     f = open(outFile, "w")
 
-    figDeg = plt.figure("Grau")
+    figDeg = plt.figure("Grau", figsize=(10,5))
     plt.title("PDFs empíricas dos graus das redes")
-    figDist = plt.figure("Distância")
+    figDegLog = plt.figure("Grau (Log)", figsize=(10,5))
+    plt.title("PDFs empíricas dos graus das redes (Escala Log)")
+    axDegLog = figDegLog.add_subplot(111)
+    figDist = plt.figure("Distância", figsize=(10,5))
     plt.title("PDFs empíricas das distâncias nas redes")
-    figCon = plt.figure("Componentes Conexas")
+    figDistLog = plt.figure("Distância (Log)", figsize=(10,5))
+    plt.title("PDFs empíricas das distâncias nas redes")
+    axDistLog = figDistLog.add_subplot(111)
+    figCon = plt.figure("Componentes Conexas", figsize=(10,5))
     plt.title("PDFs empíricas dos tamanhos das componentes conexas das redes")
-    figBet = plt.figure("Betweenness")
+    figConLog = plt.figure("Componentes Conexas (Log)", figsize=(10, 5))
+    plt.title("PDFs empíricas dos tamanhos das componentes conexas das redes")
+    axConLog = figConLog.add_subplot(111)
+    figBet = plt.figure("Betweenness", figsize=(10,5))
     plt.title("CCDFs empíricas de contralidade por betweenness nas redes")
-    figClose = plt.figure("Closeness")
+    figBetLog = plt.figure("Betweenness (Log)", figsize=(10, 5))
+    plt.title("CCDFs empíricas de contralidade por betweenness nas redes")
+    axBetLog = figBetLog.add_subplot(111)
+    figClose = plt.figure("Closeness", figsize=(10,5))
     plt.title("CCDFs empíricas de contralidade por closeness nas redes")
-    figClus = plt.figure("Clusterização")
+    figCloseLog = plt.figure("Closeness (Log)", figsize=(10, 5))
+    plt.title("CCDFs empíricas de contralidade por closeness nas redes")
+    axCloseLog = figCloseLog.add_subplot(111)
+    figClus = plt.figure("Clusterização", figsize=(10,5))
     plt.title("CCDFs empíricas da clusterização dos vértices das redes")
+    figClusLog = plt.figure("Clusterização (Log)", figsize=(10, 5))
+    plt.title("CCDFs empíricas da clusterização dos vértices das redes")
+    axClusLog = figClusLog.add_subplot(111)
 
-    for pathIdx in range(len(datapaths)):
-        g = load_graph(datapaths[pathIdx])
+    for key in datasets.keys():
+        g = load_graph(datasets[key]['path'],
+                       weighted=datasets[key]['weighted'],
+                       directed=datasets[key]['directed'])
 
-        print(nomes[pathIdx], ": (", g.number_of_nodes(), g.number_of_edges(), ")")
+        print(key, ": (", g.number_of_nodes(), g.number_of_edges(), ")")
 
-        f.write(f"REDE: {nomes[pathIdx]} - {g.number_of_nodes()} vértices X "
-                f"{g.number_of_edges()} arestas ({datapaths[pathIdx]})\n")
+        f.write(f"REDE: {key} - {g.number_of_nodes()} vértices X "
+                f"{g.number_of_edges()} arestas ({datasets[key]['path']})\n")
 
         deg = degree_analysis(g)
         f.write(f"Grau: "
@@ -248,20 +297,45 @@ if __name__ == "__main__":
                 f"\tMediana: {deg[4]}\n"
                 f"{deg[5]} (PDF)\n\n")
         plt.figure(figDeg.number)
-        plt.plot(deg[5][0], deg[5][1], styles[pathIdx], linewidth=.8, label=nomes[pathIdx])
-        if nomes[pathIdx] == nomes[-1]:
+        plt.plot(deg[5][0], deg[5][1], datasets[key]['style'],
+                 color= datasets[key]['color'], linewidth=.8, label=key)
+        axDegLog.plot(deg[5][0], deg[5][1], datasets[key]['style'],
+                      color= datasets[key]['color'], linewidth=0.5, label=key)
+
+        if key == lastKey:
+            plt.xlabel("Grau do vértice")
+            plt.legend()
+            plt.grid(True)
+            plt.figure(figDegLog.number)
+            plt.xlabel("Grau do vértice")
+            axDegLog.grid(True)
+            axDegLog.set_yscale("logit")
+            axDegLog.set_xscale("log")
+            axDegLog.yaxis.set_minor_formatter(NullFormatter())
             plt.legend()
 
         dist = distance_analysis(g)
-        f.write(f"Distância: \n"
+        f.write(f"Distância: ({dist[6]} pares alcançáveis)\n"
                 f"\tMínima: {dist[0]}\n"
                 f"\tMáxima: {dist[1]}\n"
                 f"\tMédia: {dist[2]} +- {dist[3]}\n"
                 f"\tMediana: {dist[4]}\n"
                 f"{dist[5]} (PDF)\n\n")
         plt.figure(figDist.number)
-        plt.plot(dist[5][0], dist[5][1], styles[pathIdx], linewidth=.8, label=nomes[pathIdx])
-        if nomes[pathIdx] == nomes[-1]:
+        plt.plot(dist[5][0], dist[5][1], datasets[key]['style'],
+                 color= datasets[key]['color'], linewidth=.8, label=key)
+        axDistLog.plot(dist[5][0], dist[5][1], datasets[key]['style'],
+                        color= datasets[key]['color'], linewidth=.5, label=key)
+        if key == lastKey:
+            plt.xlabel("Distância entre vértices")
+            plt.legend()
+            plt.grid(True)
+            plt.figure(figDistLog.number)
+            plt.xlabel("Distância entre vértices")
+            axDistLog.grid(True)
+            axDistLog.set_yscale("log")
+            axDistLog.set_xscale("log")
+            axDistLog.yaxis.set_minor_formatter(NullFormatter())
             plt.legend()
 
         try:
@@ -273,8 +347,22 @@ if __name__ == "__main__":
                     f"\tMediana: {con[5]}\n"
                     f"{con[6]} (PDF)\n\n")
             plt.figure(figCon.number)
-            plt.plot(con[6][0], con[6][1], styles[pathIdx], linewidth=.8, label=nomes[pathIdx])
+            plt.plot(con[6][0], con[6][1], datasets[key]['style'],
+                 color= datasets[key]['color'], linewidth=.8, label=key)
             plt.legend()
+            plt.xlabel("Tamanho da componente conexa")
+            plt.grid(True)
+
+            plt.figure(figConLog.number)
+            axConLog.plot(con[6][0], con[6][1], datasets[key]['style'],
+                          color= datasets[key]['color'], linewidth=0.5, label=key)
+            axConLog.grid(True)
+            axConLog.set_xscale("log")
+            axConLog.set_yscale("log")
+            axConLog.yaxis.set_minor_formatter(NullFormatter())
+            axConLog.legend(loc="right")
+            plt.xlabel("Tamanho da componente conexa")
+
         except nx.NetworkXNotImplemented:
             print("Grafo é direcionado, análise de componenetes conexas nao realizada")
             # TODO: Fazer versão fortemente conexa?
@@ -288,9 +376,22 @@ if __name__ == "__main__":
                 f"\tMediana: {bet[4]}\n"
                 f"{bet[5]} (CCDF)\n\n")
         plt.figure(figBet.number)
-        plt.plot(bet[5][0], bet[5][1], styles[pathIdx], linewidth=.8, label=nomes[pathIdx])
-        if nomes[pathIdx] == nomes[-1]:
+        plt.plot(bet[5][0], bet[5][1], datasets[key]['style'],
+                 color= datasets[key]['color'], linewidth=.8, label=key)
+        axBetLog.plot(bet[5][0], bet[5][1], datasets[key]['style'],
+                      color= datasets[key]['color'], linewidth=0.5, label=key)
+        if key == lastKey:
+            plt.xlabel("Betweenness do vértice")
             plt.legend()
+            plt.grid(True)
+            plt.figure(figBetLog.number)
+            plt.xlabel("Betweenness do vértice")
+            axBetLog.grid(True)
+            axBetLog.set_yscale("log")
+            axBetLog.set_xscale("log")
+            axBetLog.yaxis.set_minor_formatter(NullFormatter())
+            plt.legend()
+
         close = closeness_analysis(g)
         f.write(f"Closeness: \t(Contralidade 2)\n"
                 f"\tMínimo: {close[0]}\n"
@@ -299,20 +400,44 @@ if __name__ == "__main__":
                 f"\tMediana: {close[4]}\n"
                 f"{close[5]} (CCDF)\n\n")
         plt.figure(figClose.number)
-        plt.plot(close[5][0], close[5][1], styles[pathIdx], linewidth=.8, label=nomes[pathIdx])
-        if nomes[pathIdx] == nomes[-1]:
+        plt.plot(close[5][0], close[5][1], datasets[key]['style'],
+                 color= datasets[key]['color'], linewidth=.8, label=key)
+        axCloseLog.plot(close[5][0], close[5][1], datasets[key]['style'],
+                        color= datasets[key]['color'], linewidth=.5, label=key)
+        if key == lastKey:
+            plt.xlabel("Closeness do vértice")
+            plt.legend()
+            plt.grid(True)
+            plt.figure(figCloseLog.number)
+            plt.xlabel("Closeness do vértice")
+            axCloseLog.grid(True)
+            axCloseLog.set_yscale("log")
+            axCloseLog.set_xscale("log")
+            axCloseLog.yaxis.set_minor_formatter(NullFormatter())
             plt.legend()
 
         try:
             clust = clustering_analysis(g)
             f.write(f"Clustering: \n"
-                    f"\tMínimo: {bet[0]}\n"
-                    f"\tMáximo: {bet[1]}\n"
-                    f"\tMédia: {bet[2]} +- {bet[3]}\n"
-                    f"\tMediana: {bet[4]}\n"
-                    f"{bet[5]} (CCDF)\n")
+                    f"\tMínimo: {clust[0]}\n"
+                    f"\tMáximo: {clust[1]}\n"
+                    f"\tMédia: {clust[2]} +- {clust[3]}\n"
+                    f"\tMediana: {clust[4]}\n"
+                    f"{clust[5]} (CCDF)\n")
             plt.figure(figClus.number)
-            plt.plot(clust[5][0], clust[5][1], styles[pathIdx], linewidth=.8, label=nomes[pathIdx])
+            plt.plot(clust[5][0], clust[5][1], datasets[key]['style'],
+                 color= datasets[key]['color'], linewidth=.8, label=key)
+            axClusLog.plot(clust[5][0], clust[5][1], datasets[key]['style'],
+                           color=datasets[key]['color'], linewidth=.5, label=key)
+            plt.xlabel("Clusterização do vértice")
+            plt.legend()
+            plt.grid(True)
+            plt.figure(figClusLog.number)
+            plt.xlabel("Clusterização do vértice")
+            axClusLog.grid(True)
+            axClusLog.set_yscale("log")
+            axClusLog.set_xscale("log")
+            axClusLog.yaxis.set_minor_formatter(NullFormatter())
             plt.legend()
         except nx.NetworkXNotImplemented:
             print("Grafo é 'multigraph', análise de clusterização não realizada")
@@ -322,16 +447,28 @@ if __name__ == "__main__":
 
     plt.figure(figClus.number)
     plt.savefig("Dados/distribuicao-clusterizacao.pdf")
+    plt.figure(figClusLog.number)
+    plt.savefig("Dados/distribuicao-clusterizacao-log.pdf")
     plt.figure(figClose.number)
     plt.savefig("Dados/distribuicao-closeness.pdf")
+    plt.figure(figCloseLog.number)
+    plt.savefig("Dados/distribuicao-closeness-log.pdf")
     plt.figure(figBet.number)
     plt.savefig("Dados/distribuicao-betweenness.pdf")
+    plt.figure(figBetLog.number)
+    plt.savefig("Dados/distribuicao-betweenness-log.pdf")
+    plt.figure(figConLog.number)
+    plt.savefig("Dados/distribuicao-compConexas-log.pdf")
     plt.figure(figCon.number)
     plt.savefig("Dados/distribuicao-compConexas.pdf")
     plt.figure(figDist.number)
     plt.savefig("Dados/distribuicao-distancias.pdf")
+    plt.figure(figDistLog.number)
+    plt.savefig("Dados/distribuicao-distancias-log.pdf")
     plt.figure(figDeg.number)
     plt.savefig("Dados/distribuicao-graus.pdf")
+    plt.figure(figDegLog.number)
+    plt.savefig("Dados/distribuicao-graus-log.pdf")
     #plt.show()
 
     f.close()
